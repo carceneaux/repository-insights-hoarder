@@ -1,0 +1,54 @@
+name: "Repository Insight Hoarder"
+description: "GitHub action to read repository insights daily and store these in a file. GitHub only makes 14 days of insights available via the API, so this action helps to archive them for long-term analysis."
+author: "Chris Arceneaux"
+version: "1.0.0"
+
+inputs:
+  insights_token:
+    description: "GitHub token used to retrieve repository insights."
+    default: ${{ secrets.INSIGHTS_TOKEN }}
+    required: true
+  commit_token:
+    description: "GitHub token used to save insights to storage repository."
+    default: ${{ secrets.COMMIT_TOKEN }}
+    required: true
+  owner:
+    description: "The repository owner or organization where insights will be gathered."
+    default: ${{ github.owner }}
+    required: false
+  all_repos:
+    description: "If true, the action will gather insights for all repositories under the specified owner or organization."
+    required: false
+    default: "false"
+  repository:
+    description: "The repository to track insights for."
+    default: ${{ github.repository }}
+    required: false
+  storage_owner:
+    description: "The repository owner or organization where insights will be stored."
+    default: ${{ github.owner }}
+    required: false
+  storage_repo:
+    description: "The repository where insights will be stored."
+    default: ${{ github.repository }}
+    required: false
+  branch:
+    description: "The branch to commit the insights file to."
+    required: false
+    default: "repository-insights"
+  directory:
+    description: "The root directory where insights file will be stored."
+    required: false
+    default: ".insights"
+  format:
+    description: "The format for the insights file, either 'json' or 'csv'."
+    required: false
+    default: "csv"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
+
+branding:
+  icon: "bar-chart"
+  color: "blue"

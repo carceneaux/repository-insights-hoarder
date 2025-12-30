@@ -11,9 +11,19 @@ All contributions to this repository must be signed as described on our [Develop
 
 Please note we have a [Code of Conduct](#code-of-conduct). Please follow it in all your interactions with the project.
 
+Please follow these steps when contributing to this project:
+
+* Clone the repository or download the files.
+* Make your changes to the action's code in `load.js`.
+* Run `npm install` to install package dependencies locally
+* Test your changes locally by uncommenting mock variables in `load.js` and run `node index.js`
+* Write unit tests for your changes in `__tests__`
+* Run the tests with `npm test`
+* Open a Pull Request in `carceneaux/repository-insight-hoarder`.
+
 ## Report Bugs/Feature Requests using the Github Issue Tracker
 
-We use GitHub's Issue Tracker to track bugs/feature Requests. Report a bug or feature request by [opening a new issue](https://github.com/VeeamHub/{repo-name}/issues/new/choose). It's that easy!
+We use GitHub's Issue Tracker to track bugs/feature Requests. Report a bug or feature request by [opening a new issue](https://github.com/carceneaux/repository-insights-hoarder/issues/new/choose). It's that easy!
 
 ## License
 
@@ -76,7 +86,7 @@ further defined and clarified by project maintainers.
 ### Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported by contacting the project team at <veeamhub@veeam.com>. All
+reported by contacting the project team at <carcenea@gmail.com>. All
 complaints will be reviewed and investigated and will result in a response that
 is deemed necessary and appropriate to the circumstances. The project team is
 obligated to maintain confidentiality with regard to the reporter of an incident.
