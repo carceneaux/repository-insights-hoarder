@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '**.js'
+      - '**.json'
+      - 'package.json'
+      - 'package-lock.json'
 
 jobs:
   build:
