@@ -1,4 +1,4 @@
-# Github Action: Repository Insight Tracker
+# Github Action: Repository Insight Hoarder
 
 This GitHub Action updates the repository statistics including the number of stargazers, commits, contributors, traffic views, and clones.
 The results are stored in a JSON or CSV file and committed to a specified branch in the repository.
