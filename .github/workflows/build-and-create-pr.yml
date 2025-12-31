@@ -33,3 +33,7 @@ jobs:
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.PR_TOKEN }}
+          title: ${{ github.event.head_commit.message }}
+          body: See detailed information in this [commit link](${{ github.event.head_commit.url }})
