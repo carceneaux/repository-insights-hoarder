@@ -6,7 +6,6 @@ version: "1.0.0"
 inputs:
   insights_token:
     description: "GitHub token used to retrieve repository insights."
-    default: ${{ secrets.TOKEN }}
     required: true
   commit_token:
     description: "GitHub token used to save insights to storage repository."
