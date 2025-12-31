@@ -84,7 +84,7 @@ async function run() {
 
         let i = 14;
         while (i != 1) {
-          // Capture the previous 13 days of data
+          // Capture the previous 14 days of data
           const today = new Date();
           today.setDate(today.getDate() - i);
           let yesterdayDateString = today.toISOString().split("T")[0];
