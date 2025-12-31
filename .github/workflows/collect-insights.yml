@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Collect insights
-        uses: carceneaux/repository-insight-hoarder@main
+        uses: carceneaux/repository-insights-hoarder@main
