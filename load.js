@@ -75,9 +75,9 @@ async function run() {
         format,
       });
 
-      // Check if the insights file is empty or has less than 13 entries
+      // Check if the insights file is empty or has less than 14 entries
       if (insightsCount < 13) {
-        console.log("Insights file is empty or has less than 13 entries.");
+        console.log("Insights file is empty or has less than 14 entries.");
         console.log(
           "Ensuring the previous 14 days of data are present in the insights file."
         );
