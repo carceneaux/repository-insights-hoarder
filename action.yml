@@ -1,5 +1,5 @@
 name: "Repository Insights Hoarder"
-description: "GitHub action to read repository insights daily and hoard them in a file for each repository. GitHub only makes 14 days of insights available, so this action helps to archive them for long-term analysis."
+description: "This action reads repository insights daily and hoards them in a file. This extends GitHub's 14 day accessiblity limit."
 author: "Chris Arceneaux"
 version: "1.0.0"
 
