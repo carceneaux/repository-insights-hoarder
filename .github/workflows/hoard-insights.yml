@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-stats:
+  hoard-insights:
     runs-on: ubuntu-latest
     steps:
       - name: Collect insights
