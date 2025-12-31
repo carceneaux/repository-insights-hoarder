@@ -13,13 +13,16 @@ Please note we have a [Code of Conduct](#code-of-conduct). Please follow it in a
 
 Please follow these steps when contributing to this project:
 
-* Clone the repository or download the files.
+* Fork this repository
+* Clone the fork locally
 * Make your changes to the action's code in `load.js`.
 * Run `npm install` to install package dependencies locally
 * Test your changes locally by uncommenting mock variables in `load.js` and run `node index.js`
 * Write unit tests for your changes in `__tests__`
 * Run the tests with `npm test`
-* Open a Pull Request in `carceneaux/repository-insight-hoarder`.
+* Open a Pull Request
+
+[If you are new to contributing to open source projects, more information can be found here](https://docs.github.com/en/get-started/exploring-projects-on-github/contributing-to-open-source).
 
 ## Report Bugs/Feature Requests using the Github Issue Tracker
 
