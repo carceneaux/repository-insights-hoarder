@@ -1,17 +1,16 @@
-name: "Repository Insight Hoarder"
-description: "GitHub action to read repository insights daily and store these in a file. GitHub only makes 14 days of insights available via the API, so this action helps to archive them for long-term analysis."
+name: "Repository Insights Hoarder"
+description: "GitHub action to read repository insights daily and hoard them in a file for each repository. GitHub only makes 14 days of insights available, so this action helps to archive them for long-term analysis."
 author: "Chris Arceneaux"
 version: "1.0.0"
 
 inputs:
   insights_token:
     description: "GitHub token used to retrieve repository insights."
-    default: ${{ secrets.INSIGHTS_TOKEN }}
+    default: ${{ secrets.TOKEN }}
     required: true
   commit_token:
     description: "GitHub token used to save insights to storage repository."
-    default: ${{ secrets.COMMIT_TOKEN }}
-    required: true
+    required: false
   owner:
     description: "The repository owner or organization where insights will be gathered."
     default: ${{ github.owner }}
@@ -24,12 +23,12 @@ inputs:
     description: "The repository to track insights for."
     default: ${{ github.repository }}
     required: false
-  storage_owner:
-    description: "The repository owner or organization where insights will be stored."
+  hoard_owner:
+    description: "The repository owner or organization where insights will be hoarded."
     default: ${{ github.owner }}
     required: false
-  storage_repo:
-    description: "The repository where insights will be stored."
+  hoard_repo:
+    description: "The repository where insights will be hoarded."
     default: ${{ github.repository }}
     required: false
   branch:
@@ -37,7 +36,7 @@ inputs:
     required: false
     default: "repository-insights"
   directory:
-    description: "The root directory where insights file will be stored."
+    description: "The root directory where insights file will be hoarded."
     required: false
     default: ".insights"
   format:
