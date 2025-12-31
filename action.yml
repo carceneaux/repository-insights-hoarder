@@ -12,7 +12,6 @@ inputs:
     required: false
   owner:
     description: "The repository owner or organization where insights will be gathered."
-    default: ${{ github.owner }}
     required: false
   all_repos:
     description: "If true, the action will gather insights for all repositories under the specified owner or organization."
@@ -20,15 +19,12 @@ inputs:
     default: "false"
   repository:
     description: "The repository to track insights for."
-    default: ${{ github.repository }}
     required: false
   hoard_owner:
     description: "The repository owner or organization where insights will be hoarded."
-    default: ${{ github.owner }}
     required: false
   hoard_repo:
     description: "The repository where insights will be hoarded."
-    default: ${{ github.repository }}
     required: false
   branch:
     description: "The branch to commit the insights file to."

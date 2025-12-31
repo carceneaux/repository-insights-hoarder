@@ -24,11 +24,11 @@ async function run() {
     const commitToken = core.getInput("commit_token") || insightsToken;
     const octokitInsights = github.getOctokit(insightsToken);
     const octokitCommit = github.getOctokit(commitToken);
-    const owner = core.getInput("owner");
+    const owner = core.getInput("owner") || github.context.repo.owner;
     const allRepos = core.getInput("all_repos") || "false";
-    const { owner: githubOwner, repo: githubRepo } = github.context.repo;
-    const hoardOwner = core.getInput("hoard_owner") || githubOwner;
-    const hoardRepo = core.getInput("hoard_repo") || githubRepo;
+    const hoardOwner =
+      core.getInput("hoard_owner") || github.context.repo.owner;
+    const hoardRepo = core.getInput("hoard_repo") || github.context.repo.repo;
     const branch = core.getInput("branch") || "repository-insights";
     const rootDir = core.getInput("directory") || ".insights";
     const format = (core.getInput("format") || "csv").toLowerCase(); // 'json' or 'csv'
@@ -45,9 +45,9 @@ async function run() {
     if (allRepos === "true") {
       repos = await getRepos(octokitInsights, owner);
       console.log(`Found ${repos.length} repositories for owner: ${owner}`);
-      console.debug(repos);
+      // console.debug(repos);
     } else {
-      repo = core.getInput("repository");
+      repo = core.getInput("repository") || github.context.repo.repo;
       repos = [repo];
     }
 
