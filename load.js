@@ -1,8 +1,6 @@
 const core = require("@actions/core");
 const github = require("@actions/github");
 const path = require("path");
-const { Base64 } = require("js-base64");
-const { ref } = require("process");
 
 async function run() {
   try {
@@ -14,29 +12,27 @@ async function run() {
     // process.env.INPUT_OWNER = "carceneaux";
     // process.env.INPUT_REPOSITORY = "packer-vsphere";
     // process.env.INPUT_ALL_REPOS = "true";
-    // process.env.INPUT_STORAGE_OWNER = "carceneaux";
-    // process.env.INPUT_STORAGE_REPO = "repository_insights";
+    // process.env.INPUT_HOARD_OWNER = "carceneaux";
+    // process.env.INPUT_HOARD_REPO = "repository_insights";
     // process.env.INPUT_BRANCH = "main";
     // process.env.INPUT_DIRECTORY = ".";
     // process.env.INPUT_FORMAT = "json";
     // process.env.GITHUB_REPOSITORY = "owner/repository"; // Required for github.context.repo
 
     // Initializing inputs and Octokit clients
-    const insightsToken =
-      core.getInput("insights_token");
-    const commitToken =
-      core.getInput("commit_token");
+    const insightsToken = core.getInput("insights_token");
+    const commitToken = core.getInput("commit_token") || insightsToken;
     const octokitInsights = github.getOctokit(insightsToken);
     const octokitCommit = github.getOctokit(commitToken);
     const owner = core.getInput("owner");
     const allRepos = core.getInput("all_repos") || "false";
     const { owner: githubOwner, repo: githubRepo } = github.context.repo;
-    const storageOwner = core.getInput("storage_owner") || githubOwner;
-    const storageRepo = core.getInput("storage_repo") || githubRepo;
+    const hoardOwner = core.getInput("hoard_owner") || githubOwner;
+    const hoardRepo = core.getInput("hoard_repo") || githubRepo;
     const branch = core.getInput("branch") || "repository-insights";
     const rootDir = core.getInput("directory") || ".insights";
     const format = (core.getInput("format") || "csv").toLowerCase(); // 'json' or 'csv'
-    console.log("Storage repo set to: " + storageOwner + "/" + storageRepo);
+    console.log("Hoard repo set to: " + hoardOwner + "/" + hoardRepo);
     console.log(
       `Sending insights to the '${branch}' branch in the '${rootDir}' directory in the ${format} format.`
     );
@@ -44,9 +40,12 @@ async function run() {
     // Variable used to check for duplicate SHAs and if a commit was made
     let refCommitSha, newCommit;
 
+    // Determine repositories to process
     let repo, repos;
     if (allRepos === "true") {
       repos = await getRepos(octokitInsights, owner);
+      console.log(`Found ${repos.length} repositories for owner: ${owner}`);
+      console.debug(repos);
     } else {
       repo = core.getInput("repository");
       repos = [repo];
@@ -60,15 +59,15 @@ async function run() {
 
       await ensureBranchExists({
         octokitCommit,
-        storageOwner,
-        storageRepo,
+        hoardOwner,
+        hoardRepo,
         branch,
       });
 
       let [insightsFile, insightsCount] = await getInsightsFile({
         octokitCommit,
-        storageOwner,
-        storageRepo,
+        hoardOwner,
+        hoardRepo,
         owner,
         repo,
         branch,
@@ -128,6 +127,32 @@ async function run() {
         getYesterdayClones(octokitInsights, owner, repo, yesterdayDateString),
       ]);
 
+      const fileContent = await generateFileContent({
+        insightsFile,
+        stargazerCount,
+        commitCount,
+        contributorsCount,
+        yesterdayTraffic,
+        yesterdayClones,
+        yesterdayDateString,
+        format,
+      });
+      // console.debug("File Content:", fileContent);
+
+      [refCommitSha, newCommit] = await commitFileToBranch({
+        octokitCommit,
+        hoardOwner,
+        hoardRepo,
+        owner,
+        repo,
+        branch,
+        rootDir,
+        fileContent,
+        format,
+        refCommitSha,
+        newCommit,
+      });
+
       logResults({
         stargazerCount,
         commitCount,
@@ -144,32 +169,6 @@ async function run() {
       //   yesterdayTraffic,
       //   yesterdayClones,
       // });
-
-      const fileContent = await generateFileContent({
-        insightsFile,
-        stargazerCount,
-        commitCount,
-        contributorsCount,
-        yesterdayTraffic,
-        yesterdayClones,
-        yesterdayDateString,
-        format,
-      });
-      // console.debug("File Content:", fileContent);
-
-      [refCommitSha, newCommit] = await commitFileToBranch({
-        octokitCommit,
-        storageOwner,
-        storageRepo,
-        owner,
-        repo,
-        branch,
-        rootDir,
-        fileContent,
-        format,
-        refCommitSha,
-        newCommit,
-      });
     }
   } catch (error) {
     console.log(error);
@@ -184,10 +183,21 @@ function getYesterdayDateString() {
 }
 
 async function getRepos(octokitInsights, owner) {
-  const response = await octokitInsights.rest.repos.listForOrg({
-    org: owner,
-    type: "public",
-  });
+  // Repositories must belong to either an organization or a user and there is no direct way to know which one it is.
+  let response;
+  try {
+    // Try to get organization repositories
+    response = await octokitInsights.rest.repos.listForOrg({
+      org: owner,
+      type: "public",
+    });
+  } catch {
+    // If it fails, get user repositories
+    response = await octokitInsights.rest.repos.listForUser({
+      username: owner,
+      type: "public",
+    });
+  }
 
   return response.data.map((repo) => repo.name);
 }
@@ -277,26 +287,26 @@ function logResults({
   console.log(`Total Unique Clones Yesterday: ${yesterdayClones.uniques}`);
 }
 
-function setOutputs({
-  stargazerCount,
-  commitCount,
-  contributorsCount,
-  yesterdayTraffic,
-  yesterdayClones,
-}) {
-  core.setOutput("stargazers", stargazerCount);
-  core.setOutput("commits", commitCount);
-  core.setOutput("contributors", contributorsCount);
-  core.setOutput("traffic_views", yesterdayTraffic.count);
-  core.setOutput("traffic_uniques", yesterdayTraffic.uniques);
-  core.setOutput("clones_count", yesterdayClones.count);
-  core.setOutput("clones_uniques", yesterdayClones.uniques);
-}
+// function setOutputs({
+//   stargazerCount,
+//   commitCount,
+//   contributorsCount,
+//   yesterdayTraffic,
+//   yesterdayClones,
+// }) {
+//   core.setOutput("stargazers", stargazerCount);
+//   core.setOutput("commits", commitCount);
+//   core.setOutput("contributors", contributorsCount);
+//   core.setOutput("traffic_views", yesterdayTraffic.count);
+//   core.setOutput("traffic_uniques", yesterdayTraffic.uniques);
+//   core.setOutput("clones_count", yesterdayClones.count);
+//   core.setOutput("clones_uniques", yesterdayClones.uniques);
+// }
 
 async function getInsightsFile({
   octokitCommit,
-  storageOwner,
-  storageRepo,
+  hoardOwner,
+  hoardRepo,
   owner,
   repo,
   branch,
@@ -306,19 +316,22 @@ async function getInsightsFile({
   const file_path_owner = owner;
   const file_path_repo = repo;
   const dirPath = path.join(rootDir, file_path_owner, file_path_repo);
-  const filePath = path.join(dirPath, `stats.${format}`);
+  const filePath = path.join(dirPath, `insights.${format}`);
 
   let insightsFile, insightsCount;
 
   try {
     // Check if the file exists in the repository
     const { data: fileData } = await octokitCommit.rest.repos.getContent({
-      owner: storageOwner,
-      repo: storageRepo,
+      owner: hoardOwner,
+      repo: hoardRepo,
       path: filePath,
       ref: branch,
     });
-    const existingContent = Base64.decode(fileData.content);
+    // const existingContent = Base64.decode(fileData.content);
+    const existingContent = Buffer.from(fileData.content, "base64").toString(
+      "utf-8"
+    );
 
     if (format === "json") {
       insightsFile = existingContent;
@@ -443,15 +456,15 @@ async function generateFileContent({
 
 async function ensureBranchExists({
   octokitCommit,
-  storageOwner,
-  storageRepo,
+  hoardOwner,
+  hoardRepo,
   branch,
 }) {
   try {
     // Check if the branch exists
     await octokitCommit.rest.git.getRef({
-      owner: storageOwner,
-      repo: storageRepo,
+      owner: hoardOwner,
+      repo: hoardRepo,
       ref: `heads/${branch}`,
     });
     // Branch exists, no action needed
@@ -459,16 +472,16 @@ async function ensureBranchExists({
     if (error.status === 404) {
       // Branch does not exist, create it
       const { data: refData } = await octokitCommit.rest.git.getRef({
-        owner: storageOwner,
-        repo: storageRepo,
+        owner: hoardOwner,
+        repo: hoardRepo,
         ref: "heads/main", // Base branch from which to create the new branch
       });
 
       const mainSha = refData.object.sha;
 
       await octokitCommit.rest.git.createRef({
-        owner: storageOwner,
-        repo: storageRepo,
+        owner: hoardOwner,
+        repo: hoardRepo,
         ref: `refs/heads/${branch}`,
         sha: mainSha,
       });
@@ -482,8 +495,8 @@ async function ensureBranchExists({
 
 async function commitFileToBranch({
   octokitCommit,
-  storageOwner,
-  storageRepo,
+  hoardOwner,
+  hoardRepo,
   owner,
   repo,
   branch,
@@ -496,15 +509,15 @@ async function commitFileToBranch({
   const file_path_owner = owner;
   const file_path_repo = repo;
   const dirPath = path.join(rootDir, file_path_owner, file_path_repo);
-  const filePath = path.join(dirPath, `stats.${format}`);
+  const filePath = path.join(dirPath, `insights.${format}`);
   console.debug(
-    `Listing vars before commit: owner=${storageOwner}, repo=${storageRepo}, branch=${branch}, filePath=${filePath}`
+    `Listing vars before commit: owner=${hoardOwner}, repo=${hoardRepo}, branch=${branch}, filePath=${filePath}`
   );
 
   // Get the SHA of the branch reference
   let { data: refData } = await octokitCommit.rest.git.getRef({
-    owner: storageOwner,
-    repo: storageRepo,
+    owner: hoardOwner,
+    repo: hoardRepo,
     ref: `heads/${branch}`,
   });
 
@@ -519,8 +532,8 @@ async function commitFileToBranch({
     console.log("Duplicate commit SHA detected. Waiting before retrying...");
     await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait for 2 seconds
     let { data: refData } = await octokitCommit.rest.git.getRef({
-      owner: storageOwner,
-      repo: storageRepo,
+      owner: hoardOwner,
+      repo: hoardRepo,
       ref: `heads/${branch}`,
     });
     commitSha = refData.object.sha;
@@ -531,8 +544,8 @@ async function commitFileToBranch({
 
   // Get the tree associated with the latest commit
   let { data: commitData } = await octokitCommit.rest.git.getCommit({
-    owner: storageOwner,
-    repo: storageRepo,
+    owner: hoardOwner,
+    repo: hoardRepo,
     commit_sha: commitSha,
   });
 
@@ -540,16 +553,16 @@ async function commitFileToBranch({
 
   // Create a new blob with the file content
   const { data: blobData } = await octokitCommit.rest.git.createBlob({
-    owner: storageOwner,
-    repo: storageRepo,
+    owner: hoardOwner,
+    repo: hoardRepo,
     content: fileContent,
     encoding: "utf-8",
   });
 
   // Create a new tree that adds the new file
   const { data: newTreeData } = await octokitCommit.rest.git.createTree({
-    owner: storageOwner,
-    repo: storageRepo,
+    owner: hoardOwner,
+    repo: hoardRepo,
     base_tree: treeSha,
     tree: [
       {
@@ -566,27 +579,36 @@ async function commitFileToBranch({
 
   if (newTreeData.sha === treeSha) {
     console.log("No changes detected. Skipping commit.");
-    return [refCommitSha, false];
+    return [refCommitSha, false]; // Indicate that no new commit was made
   } else {
     // Create a new commit
     const { data: newCommitData } = await octokitCommit.rest.git.createCommit({
-      owner: storageOwner,
-      repo: storageRepo,
-      message: `Update stats file for ${file_path_owner}/${file_path_repo}`,
+      owner: hoardOwner,
+      repo: hoardRepo,
+      message: `Update insights file for ${file_path_owner}/${file_path_repo}`,
       tree: newTreeData.sha,
       parents: [commitSha],
     });
     console.debug(`New commit SHA: ${newCommitData.sha}`);
 
     // Update the branch reference to point to the new commit
-    await octokitCommit.rest.git.updateRef({
-      owner: storageOwner,
-      repo: storageRepo,
-      ref: `heads/${branch}`,
-      sha: newCommitData.sha,
-    });
+    let updateRefSuccess = false;
+    while (!updateRefSuccess) {
+      try {
+        await octokitCommit.rest.git.updateRef({
+          owner: hoardOwner,
+          repo: hoardRepo,
+          ref: `heads/${branch}`,
+          sha: newCommitData.sha,
+        });
+        updateRefSuccess = true;
+      } catch {
+        console.log("Retrying updateRef due to potential race condition...");
+        await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait for 5 seconds
+      }
+    }
 
-    return [refCommitSha, true];
+    return [refCommitSha, true]; // Indicate that a new commit was made
   }
 }
 
