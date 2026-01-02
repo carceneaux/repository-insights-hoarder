@@ -60,6 +60,8 @@ To generate the token(s), follow the steps below:
 
 To use this action in your repository, create a workflow file (e.g., `.github/workflows/hoard-insights.yml`) with the contents below.
 
+***Note: Do not have multiple workflows writing to the same repository & branch at the same time. Instead, either use a different repository and/or branch.***
+
 This is the minimum configurable parameters to run the job,
 and will collect insights daily, on the repository that the workflow sits in,
 and store these as a CSV file, on the branch repository-insights, in directory `/.insights/<owner>/<repository>/insights.csv`.

@@ -592,21 +592,12 @@ async function commitFileToBranch({
     console.debug(`New commit SHA: ${newCommitData.sha}`);
 
     // Update the branch reference to point to the new commit
-    let updateRefSuccess = false;
-    while (!updateRefSuccess) {
-      try {
-        await octokitCommit.rest.git.updateRef({
-          owner: hoardOwner,
-          repo: hoardRepo,
-          ref: `heads/${branch}`,
-          sha: newCommitData.sha,
-        });
-        updateRefSuccess = true;
-      } catch {
-        console.log("Retrying updateRef due to potential race condition...");
-        await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait for 5 seconds
-      }
-    }
+    await octokitCommit.rest.git.updateRef({
+      owner: hoardOwner,
+      repo: hoardRepo,
+      ref: `heads/${branch}`,
+      sha: newCommitData.sha,
+    });
 
     return [refCommitSha, true]; // Indicate that a new commit was made
   }
