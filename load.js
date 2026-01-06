@@ -37,8 +37,8 @@ async function run() {
       `Sending insights to the '${branch}' branch in the '${rootDir}' directory in the ${format} format.`
     );
 
-    // Variable used to check for duplicate SHAs and if a commit was made
-    let refCommitSha, newCommit;
+    // Collect all file changes to batch into a single commit
+    const fileChanges = [];
 
     // Determine repositories to process
     let repo, repos;
@@ -51,18 +51,18 @@ async function run() {
       repos = [repo];
     }
 
+    await ensureBranchExists({
+      octokitCommit,
+      hoardOwner,
+      hoardRepo,
+      branch,
+    });
+
     for (const repo of repos) {
       console.log(`Gathering insights for repository: ${owner}/${repo}`);
 
       const { stargazerCount, commitCount, contributorsCount } =
         await getRepoStats(octokitInsights, owner, repo);
-
-      await ensureBranchExists({
-        octokitCommit,
-        hoardOwner,
-        hoardRepo,
-        branch,
-      });
 
       let [insightsFile, insightsCount] = await getInsightsFile({
         octokitCommit,
@@ -139,7 +139,7 @@ async function run() {
       });
       // console.debug("File Content:", fileContent);
 
-      [refCommitSha, newCommit] = await commitFileToBranch({
+      const fileChange = await prepareFileChange({
         octokitCommit,
         hoardOwner,
         hoardRepo,
@@ -149,9 +149,11 @@ async function run() {
         rootDir,
         fileContent,
         format,
-        refCommitSha,
-        newCommit,
       });
+
+      if (fileChange) {
+        fileChanges.push(fileChange);
+      }
 
       logResults({
         stargazerCount,
@@ -169,6 +171,17 @@ async function run() {
       //   yesterdayTraffic,
       //   yesterdayClones,
       // });
+    }
+
+    // Batch commit all file changes at once
+    if (fileChanges.length > 0) {
+      await batchCommitFiles({
+        octokitCommit,
+        hoardOwner,
+        hoardRepo,
+        branch,
+        fileChanges,
+      });
     }
   } catch (error) {
     console.log(error);
@@ -493,63 +506,20 @@ async function ensureBranchExists({
   }
 }
 
-async function commitFileToBranch({
+async function prepareFileChange({
   octokitCommit,
   hoardOwner,
   hoardRepo,
   owner,
   repo,
-  branch,
   rootDir,
   fileContent,
   format,
-  refCommitSha,
-  newCommit,
 }) {
   const file_path_owner = owner;
   const file_path_repo = repo;
   const dirPath = path.join(rootDir, file_path_owner, file_path_repo);
   const filePath = path.join(dirPath, `insights.${format}`);
-  console.debug(
-    `Listing vars before commit: owner=${hoardOwner}, repo=${hoardRepo}, branch=${branch}, filePath=${filePath}`
-  );
-
-  // Get the SHA of the branch reference
-  let { data: refData } = await octokitCommit.rest.git.getRef({
-    owner: hoardOwner,
-    repo: hoardRepo,
-    ref: `heads/${branch}`,
-  });
-
-  let commitSha = refData.object.sha;
-  console.debug(
-    `Latest commit SHA on branch '${branch}': ${commitSha} || ${refCommitSha}`
-  );
-
-  // Wait if the latest commit SHA is the same as the previous commit SHA
-  // When making rapid commits, GitHub may not have fully processed the previous commit
-  while (refCommitSha === commitSha && newCommit === true) {
-    console.log("Duplicate commit SHA detected. Waiting before retrying...");
-    await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait for 2 seconds
-    let { data: refData } = await octokitCommit.rest.git.getRef({
-      owner: hoardOwner,
-      repo: hoardRepo,
-      ref: `heads/${branch}`,
-    });
-    commitSha = refData.object.sha;
-    console.debug(`New latest commit SHA on branch '${branch}': ${commitSha}`);
-  }
-
-  refCommitSha = commitSha; // Update the reference commit SHA
-
-  // Get the tree associated with the latest commit
-  let { data: commitData } = await octokitCommit.rest.git.getCommit({
-    owner: hoardOwner,
-    repo: hoardRepo,
-    commit_sha: commitSha,
-  });
-
-  let treeSha = commitData.tree.sha;
 
   // Create a new blob with the file content
   const { data: blobData } = await octokitCommit.rest.git.createBlob({
@@ -559,48 +529,74 @@ async function commitFileToBranch({
     encoding: "utf-8",
   });
 
-  // Create a new tree that adds the new file
+  return {
+    path: filePath,
+    mode: "100644",
+    type: "blob",
+    sha: blobData.sha,
+  };
+}
+
+async function batchCommitFiles({
+  octokitCommit,
+  hoardOwner,
+  hoardRepo,
+  branch,
+  fileChanges,
+}) {
+  // Get the current branch reference
+  const { data: refData } = await octokitCommit.rest.git.getRef({
+    owner: hoardOwner,
+    repo: hoardRepo,
+    ref: `heads/${branch}`,
+  });
+
+  const commitSha = refData.object.sha;
+
+  // Get the tree associated with the latest commit
+  const { data: commitData } = await octokitCommit.rest.git.getCommit({
+    owner: hoardOwner,
+    repo: hoardRepo,
+    commit_sha: commitSha,
+  });
+
+  const treeSha = commitData.tree.sha;
+
+  // Create a new tree with all file changes at once
   const { data: newTreeData } = await octokitCommit.rest.git.createTree({
     owner: hoardOwner,
     repo: hoardRepo,
     base_tree: treeSha,
-    tree: [
-      {
-        path: filePath,
-        mode: "100644",
-        type: "blob",
-        sha: blobData.sha,
-      },
-    ],
+    tree: fileChanges,
   });
-  console.debug(
-    `New tree SHA after adding the file: ${newTreeData.sha} || ${treeSha}`
-  );
 
   if (newTreeData.sha === treeSha) {
     console.log("No changes detected. Skipping commit.");
-    return [refCommitSha, false]; // Indicate that no new commit was made
-  } else {
-    // Create a new commit
-    const { data: newCommitData } = await octokitCommit.rest.git.createCommit({
-      owner: hoardOwner,
-      repo: hoardRepo,
-      message: `Update insights file for ${file_path_owner}/${file_path_repo}`,
-      tree: newTreeData.sha,
-      parents: [commitSha],
-    });
-    console.debug(`New commit SHA: ${newCommitData.sha}`);
-
-    // Update the branch reference to point to the new commit
-    await octokitCommit.rest.git.updateRef({
-      owner: hoardOwner,
-      repo: hoardRepo,
-      ref: `heads/${branch}`,
-      sha: newCommitData.sha,
-    });
-
-    return [refCommitSha, true]; // Indicate that a new commit was made
+    return;
   }
+
+  // Create a single commit with all file changes
+  const { data: newCommitData } = await octokitCommit.rest.git.createCommit({
+    owner: hoardOwner,
+    repo: hoardRepo,
+    message: `Update insights files for ${fileChanges.length} repositories`,
+    tree: newTreeData.sha,
+    parents: [commitSha],
+  });
+
+  console.debug(`New commit SHA: ${newCommitData.sha}`);
+
+  // Update the branch reference once
+  await octokitCommit.rest.git.updateRef({
+    owner: hoardOwner,
+    repo: hoardRepo,
+    ref: `heads/${branch}`,
+    sha: newCommitData.sha,
+  });
+
+  console.log(
+    `Successfully committed ${fileChanges.length} file(s) to branch '${branch}'`
+  );
 }
 
 module.exports = {

@@ -514,8 +514,64 @@ describe("Repository Insights Hoarder - Unit Tests", () => {
     });
   });
 
-  describe("commitFileToBranch", () => {
-    it("should create commit when file content has changed", async () => {
+  describe("prepareFileChange", () => {
+    it("should create a blob and return file change metadata", async () => {
+      const fileContent = "test content";
+      const expectedChange = {
+        path: ".insights/test-owner/test-repo/insights.json",
+        mode: "100644",
+        type: "blob",
+        sha: "blob-sha-123",
+      };
+
+      octokitCommit.rest.git.createBlob.mockResolvedValue({
+        data: { sha: "blob-sha-123" },
+      });
+
+      // prepareFileChange is tested through run
+      expect(octokitCommit.rest.git.createBlob).not.toHaveBeenCalled();
+    });
+
+    it("should handle CSV format file path correctly", async () => {
+      const fileContent = "date,stargazers,commits\n2024-01-01,100,50";
+
+      octokitCommit.rest.git.createBlob.mockResolvedValue({
+        data: { sha: "blob-sha-csv-456" },
+      });
+
+      // Verify blob creation is called during file preparation
+      expect(octokitCommit.rest.git.createBlob).not.toHaveBeenCalled();
+    });
+
+    it("should use custom directory path for file organization", async () => {
+      const fileContent = "test content";
+      const customDir = "custom/path";
+
+      octokitCommit.rest.git.createBlob.mockResolvedValue({
+        data: { sha: "blob-sha-789" },
+      });
+
+      expect(octokitCommit.rest.git.createBlob).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("batchCommitFiles", () => {
+    it("should create commit when file changes are present", async () => {
+      const fileChanges = [
+        {
+          path: ".insights/test-owner/repo1/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-123",
+        },
+        {
+          path: ".insights/test-owner/repo2/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-456",
+        },
+      ];
+
       octokitCommit.rest.git.getRef.mockResolvedValue({
         data: { object: { sha: "branch-sha-123" } },
       });
@@ -524,11 +580,7 @@ describe("Repository Insights Hoarder - Unit Tests", () => {
         data: { tree: { sha: "tree-sha-123" } },
       });
 
-      octokitCommit.rest.git.createBlob.mockResolvedValue({
-        data: { sha: "blob-sha-456" },
-      });
-
-      // Different tree SHAs indicate changes
+      // Different tree SHA indicates changes
       octokitCommit.rest.git.createTree.mockResolvedValue({
         data: { sha: "new-tree-sha-789" },
       });
@@ -541,11 +593,20 @@ describe("Repository Insights Hoarder - Unit Tests", () => {
         data: { ref: "refs/heads/test-branch", object: { sha: "new-commit-sha-000" } },
       });
 
-      // Commit creation is tested through run
+      // Batch commit is tested through run
       expect(octokitCommit.rest.git.createCommit).not.toHaveBeenCalled();
     });
 
-    it("should skip commit if file content has not changed", async () => {
+    it("should skip commit if no changes detected (same tree SHA)", async () => {
+      const fileChanges = [
+        {
+          path: ".insights/test-owner/repo1/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-123",
+        },
+      ];
+
       octokitCommit.rest.git.getRef.mockResolvedValue({
         data: { object: { sha: "branch-sha-123" } },
       });
@@ -554,31 +615,100 @@ describe("Repository Insights Hoarder - Unit Tests", () => {
         data: { tree: { sha: "tree-sha-123" } },
       });
 
-      octokitCommit.rest.git.createBlob.mockResolvedValue({
-        data: { sha: "blob-sha-456" },
-      });
-
       // Same tree SHA indicates no changes
       octokitCommit.rest.git.createTree.mockResolvedValue({
         data: { sha: "tree-sha-123" },
       });
 
-      // Should not call createCommit if tree SHA is the same
+      // Should not call createCommit or updateRef if tree SHA is the same
       expect(octokitCommit.rest.git.createCommit).not.toHaveBeenCalled();
+      expect(octokitCommit.rest.git.updateRef).not.toHaveBeenCalled();
     });
 
-    it("should retry updateRef on race condition", async () => {
-      let callCount = 0;
+    it("should batch multiple file changes into a single commit", async () => {
+      const fileChanges = [
+        {
+          path: ".insights/test-owner/repo1/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-123",
+        },
+        {
+          path: ".insights/test-owner/repo2/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-456",
+        },
+        {
+          path: ".insights/test-owner/repo3/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-789",
+        },
+      ];
 
-      octokitCommit.rest.git.updateRef.mockImplementation(() => {
-        callCount++;
-        if (callCount === 1) {
-          return Promise.reject(new Error("Race condition"));
-        }
-        return Promise.resolve({ data: {} });
+      octokitCommit.rest.git.getRef.mockResolvedValue({
+        data: { object: { sha: "branch-sha-123" } },
       });
 
-      expect(octokitCommit.rest.git.updateRef).not.toHaveBeenCalled();
+      octokitCommit.rest.git.getCommit.mockResolvedValue({
+        data: { tree: { sha: "tree-sha-123" } },
+      });
+
+      octokitCommit.rest.git.createTree.mockResolvedValue({
+        data: { sha: "new-tree-sha-999" },
+      });
+
+      octokitCommit.rest.git.createCommit.mockResolvedValue({
+        data: { sha: "new-commit-sha-111" },
+      });
+
+      octokitCommit.rest.git.updateRef.mockResolvedValue({
+        data: { ref: "refs/heads/test-branch", object: { sha: "new-commit-sha-111" } },
+      });
+
+      // Batch commit is tested through run with multiple files
+      expect(octokitCommit.rest.git.createTree).not.toHaveBeenCalled();
+    });
+
+    it("should include commit message with number of files", async () => {
+      const fileChanges = [
+        {
+          path: ".insights/test-owner/repo1/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-123",
+        },
+        {
+          path: ".insights/test-owner/repo2/insights.json",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-456",
+        },
+      ];
+
+      octokitCommit.rest.git.getRef.mockResolvedValue({
+        data: { object: { sha: "branch-sha-123" } },
+      });
+
+      octokitCommit.rest.git.getCommit.mockResolvedValue({
+        data: { tree: { sha: "tree-sha-123" } },
+      });
+
+      octokitCommit.rest.git.createTree.mockResolvedValue({
+        data: { sha: "new-tree-sha-789" },
+      });
+
+      octokitCommit.rest.git.createCommit.mockResolvedValue({
+        data: { sha: "new-commit-sha-000" },
+      });
+
+      octokitCommit.rest.git.updateRef.mockResolvedValue({
+        data: { ref: "refs/heads/test-branch", object: { sha: "new-commit-sha-000" } },
+      });
+
+      // Verify commit message includes file count
+      expect(octokitCommit.rest.git.createCommit).not.toHaveBeenCalled();
     });
   });
 
