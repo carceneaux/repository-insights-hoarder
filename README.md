@@ -75,12 +75,14 @@ This example assumes you have the following repository secrets defined:
 
 It will gather insights for the current repository and save the insights to the `repository-insights` branch in the `.insights` directory.
 
+***NOTE: Do not schedule action to run at midnight. More info can be found [here](https://github.com/carceneaux/repository-insights-hoarder/issues/13).***
+
 ```yaml
 name: Collect repository insights
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs daily at midnight
+    - cron: '0 23 * * *' # Runs daily at 11:00 PM UTC
   workflow_dispatch:
 
 jobs:
@@ -97,12 +99,14 @@ jobs:
 
 This example fetches insights from `carceneaux/repository-insights-hoarder` and saves the results in the `storage/storage` repository:
 
+***NOTE: Do not schedule action to run at midnight. More info can be found [here](https://github.com/carceneaux/repository-insights-hoarder/issues/13).***
+
 ```yaml
 name: Collect repository insights
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs daily at midnight
+    - cron: '0 23 * * *' # Runs daily at 11:00 PM UTC
   workflow_dispatch:
 
 jobs:
@@ -125,12 +129,14 @@ jobs:
 
 This example fetches insights from **all public** repositories belonging to `carceneaux` and saves the results in the `storage/storage` repository located in the `main` branch of the root directory in the JSON format:
 
+***NOTE: Do not schedule action to run at midnight. More info can be found [here](https://github.com/carceneaux/repository-insights-hoarder/issues/13).***
+
 ```yaml
 name: Collect repository insights
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs daily at midnight
+    - cron: '0 23 * * *' # Runs daily at 11:00 PM UTC
   workflow_dispatch:
 
 jobs:
