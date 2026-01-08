@@ -1,6 +1,6 @@
 # Github Action: Repository Insights Hoarder
 
-This GitHub Action gathers repository ingsights and "hoards" the results in a JSON or CSV file. GitHub only makes 14 days of insights available, so this action helps to archive them for long-term analysis.
+This GitHub Action gathers repository insights and "hoards" the results in a JSON or CSV file. GitHub only makes 14 days of insights available, so this action helps to archive them for long-term analysis.
 
 1. Collects statistics on stargazers, commits, contributors, traffic views, and clones using the Github Rest API and GraphQL API.
 2. Writes the statistics to a JSON or CSV file under `<directory>/<owner>/<repository>/insights.<format>`.
