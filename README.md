@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Collect insights
-        uses: carceneaux/repository-insights-hoarder@v1.0.2
+        uses: carceneaux/repository-insights-hoarder@v1.0.3
         with:
           insights_token: ${{ secrets.INSIGHTS_TOKEN }}
 ```
@@ -115,7 +115,7 @@ jobs:
     steps:
       - name: Collect insights
         id: collect-insights
-        uses: carceneaux/repository-insights-hoarder@v1.0.2
+        uses: carceneaux/repository-insights-hoarder@v1.0.3
         with:
           insights_token: ${{ secrets.INSIGHTS_TOKEN }}
           commit_token: ${{ secrets.COMMIT_TOKEN }}
@@ -145,7 +145,7 @@ jobs:
     steps:
       - name: Collect insights
         id: collect-insights
-        uses: carceneaux/repository-insights-hoarder@v1.0.2
+        uses: carceneaux/repository-insights-hoarder@v1.0.3
         with:
           insights_token: ${{ secrets.INSIGHTS_TOKEN }}
           commit_token: ${{ secrets.COMMIT_TOKEN }}
